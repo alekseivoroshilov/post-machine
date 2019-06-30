@@ -1,0 +1,3 @@
+public enum Type {
+    SHIFT_LEFT, SHIFT_RIGHT, MARK, CLEAR, STOP, CONDITION;
+}
