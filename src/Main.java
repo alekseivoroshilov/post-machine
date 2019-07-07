@@ -7,12 +7,18 @@ import java.util.ArrayList;
 import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.lang.Runtime;
 
 public class Main {
-
+    private static long getFileSizeBytes(File file) {
+        return file.length();
+    }
     public static void main(String[] args) {
         String line;
+        final long maxMemory = Runtime.getRuntime().maxMemory(); //maximum amount of memory that the JVM can use
 
+        boolean stop = false;       // остановка машины
+        boolean canceled = false; //если на брейкпоинте осознали, что вывод программы ошибочен, можно отменить
         ArrayList<Short> tape = new ArrayList<>();
         ArrayList<Command> commands = new ArrayList();
         boolean unstoppableMachine = true;
@@ -73,27 +79,38 @@ public class Main {
 
             // могу ли сделать подобное:
             //---------------------------------------------------
-
+            StringBuilder stringBuilder = new StringBuilder();
+            long usedMemory = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
             input = new File("./src/tapes/" + args[1]);
-            fileReader = new FileReader(input);
-            br = new BufferedReader(fileReader);
-            line = br.readLine();
+            if(maxMemory - usedMemory < getFileSizeBytes(input)){ //если размер файла превышает допустимый
+                stop = true;
+                canceled = true;
+                br.close();
+                fileReader.close();
+                throw new OutOfMemoryError();
+            } else { // если размер файла удовлетворительный, то продолжаем работу
+                fileReader = new FileReader(input);
+                br = new BufferedReader(fileReader);
+                //line = br.readLine();
+                while( ( line = br.readLine() ) != null )
+                    stringBuilder.append( line );
 
-            br.close();
-            fileReader.close(); ///////////////////////////////////////ЗАКРЫЛ (1)
+                br.close();
+                fileReader.close(); ///////////////////////////////////////ЗАКРЫЛ (1)
 
-            if (line == null) throw new IOException();
+                if (stringBuilder.toString().isEmpty()) throw new EmptyTapeException();
 
-            for (int i = 0; i < line.length(); i++) {
-                String letter = line.substring(i, i + 1);
-                short number = Short.parseShort(letter);
-                tape.add(number);
-            }
-            //----------------------------------------------------
+                for (int i = 0; i < stringBuilder.length(); i++) {
+                    String letter = stringBuilder.substring(i, i + 1);
+                    short number = Short.parseShort(letter);
+                    tape.add(number);
+                }
+                //----------------------------------------------------
 
-            for (int i = 0; i < commands.size(); i++) {
-                System.out.println(commands.get(i).getType() + " " + commands.get(i).getAddr1()
-                        + " " + commands.get(i).getAddr2());
+                for (int i = 0; i < commands.size(); i++) {
+                    System.out.println(commands.get(i).getType() + " " + commands.get(i).getAddr1()
+                            + " " + commands.get(i).getAddr2());
+                }
             }
         } catch (FileNotFoundException e) {
             e.printStackTrace();
@@ -101,21 +118,20 @@ public class Main {
             e.printStackTrace();
         }
         // Разбор комманд
-        boolean stop = false;       // останов
+
         int tape_cursor = 0;
         int command_cursor = 1;     // для обращения к массиву команд не забыть отнять единицу
         Command current_command;    // рассматриваемая в текущий момент команда
 
-        if (tape == null) throw new EmptyTapeException();
         System.out.println(tape.toString());
         int command_counter = 0;
         int command_limit = 0;
 
-        boolean canceled = false; //если на брейкпоинте осознали, что вывод программы ошибочен, можно отменить
         //создание текстового файла ответа в папке results
-
+        System.out.println("---------------------------POST-MACHINE EXECUTION---------------------------");
         if (!(args.length < 3)) command_limit = Integer.parseInt(args[2]);
-        while (!stop) {
+        //loop:
+        while (!stop && command_counter != 1000000) {
             command_counter++;
 
             current_command = commands.get(command_cursor - 1);
@@ -214,7 +230,8 @@ public class Main {
         }
         if(!canceled) { //если не отключили машину на брейкпоинте
             String output_name = args[0].substring(0, args[0].length() - 4);
-            File tempFile = new File("./src/results/result_" + output_name + ".txt");
+            File tempFile = new File("./src/results/result_" + output_name + "_" +
+                    args[1].substring(0, args[1].length() - 4) + ".txt");
             int i = 0;
             while (tempFile.exists()) {
                 i++;
